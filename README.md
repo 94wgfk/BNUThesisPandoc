@@ -25,15 +25,6 @@
  Times New Roman
  YouYuan,幼圆
 ```
-
-3. 执行以下命令：
-
-```
-git clone https://github.com/94wgfk/BNUThesisPandoc.git
-cd BNUThesisPandoc
-make
-```
-
 ## 使用
 
 * `src/`文件夹下存放了多个文件夹，每个文件夹代表一个project也就是一篇论文，其中包含了生成一篇论文所需要的各种源文件（以下以`xxx`为例）。`thesis.md`为论文正文，`ref.bib`为引用的文献（使用bibtex，知网和谷歌学术可以直接复制出bib格式的引用），`figures/`文件夹存放的是引用的图片。
